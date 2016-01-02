@@ -5,6 +5,7 @@ import (
 	"github.com/bitly/go-simplejson"
 	"log"
 	"strconv"
+	"sort"
 )
 
 func main() {
@@ -12,96 +13,11 @@ func main() {
 		log.Printf("args[%d] : %v\n", i, arg)
 	}
 
-	json := `{
-    "Records": [
-        {
-            "eventID": "1234567890",
-            "eventName": "INSERT",
-            "eventVersion": "1.0",
-            "eventSource": "aws:dynamodb",
-            "awsRegion": "ap-northeast-1",
-            "dynamodb": {
-                "Keys": {
-                    "id": {
-                        "S": "id1"
-                    }
-                },
-                "NewImage": {
-                    "nullvalue": {
-                        "NULL": true
-                    },
-                    "str": {
-                        "S": "aaa"
-                    },
-                    "bool": {
-                        "BOOL": true
-                    },
-                    "strSet": {
-                        "SS": [
-                            "aaa",
-                            "bbb"
-                        ]
-                    },
-                    "numset": {
-                        "NS": [
-                            "222",
-                            "111"
-                        ]
-                    },
-                    "bin": {
-                        "B": "0000"
-                    },
-                    "num": {
-                        "N": "1234"
-                    },
-                    "id": {
-                        "S": "id1"
-                    },
-                    "list": {
-                        "L": [
-                            {
-                                "S": "aaa"
-                            },
-                            {
-                                "N": "111"
-                            },
-                            {
-                                "BOOL": false
-                            }
-                        ]
-                    },
-                    "binset": {
-                        "BS": [
-                            "0000",
-                            "1111"
-                        ]
-                    },
-                    "map": {
-                        "M": {
-                            "numVal": {
-                                "N": "123"
-                            },
-                            "strVal": {
-                                "S": "aaa"
-                            },
-                            "boolVal": {
-                                "BOOL": false
-                            }                        }
-                    }
-                },
-                "SequenceNumber": "123",
-                "SizeBytes": 120,
-                "StreamViewType": "NEW_AND_OLD_IMAGES"
-            },
-            "eventSourceARN": "arn:aws:dynamodb:ap-northeast-1:1234567899:table/mytest/stream/2016-01-01T00:00:00.000"
-        }
-    ]
-}`
-
-	parse(&json)
+	result := parse(&os.Args[1])
+	log.Println(result)
 }
 
-func parse(jsonStr *string) {
+func parse(jsonStr *string) *string {
 	js, _ := simplejson.NewJson([]byte(*jsonStr))
 	records := js.Get("Records")
 	size := len(records.MustArray())
@@ -114,12 +30,7 @@ func parse(jsonStr *string) {
 		index := map[string]interface{}{}
 		index["_index"] = "mytest"
 		index["_type"] = "mytest"
-
-		keys := record.GetPath("dynamodb", "Keys")
-		for k1, _ := range keys.MustMap() {
-			typedValue := keys.Get(k1)
-			index["_id"] = parseValue(typedValue)
-		}
+		index["_id"] = parseKeys(record.GetPath("dynamodb", "Keys"))
 
 		action := simplejson.New()
 		eventName := record.Get("eventName").MustString()
@@ -151,13 +62,12 @@ func parse(jsonStr *string) {
 		}
 	}
 
-	log.Println(string(bulkRequest))
+	result := string(bulkRequest)
+	return &result
 }
 
 func parseValue(typedJson *simplejson.Json) interface{} {
 	for k, v := range typedJson.MustMap() {
-		log.Println("parseValue: ", k, v)
-
 		switch k {
 		case "S", "B", "BOOL":
 			return v
@@ -180,6 +90,28 @@ func parseValue(typedJson *simplejson.Json) interface{} {
 	}
 
 	return nil
+}
+
+func parseKeys(keysJson *simplejson.Json) string {
+	keys := make([]string, 0, 2)
+	for k, _ := range keysJson.MustMap() {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	content := make([]byte, 0, 64)
+	for _, k1 := range keys {
+		for k2, _ := range keysJson.Get(k1).MustMap() {
+			if len(content) > 0 {
+				content = append(content, ","...)
+			}
+			content = append(content, k1...)
+			content = append(content, ":"...)
+			content = append(content, keysJson.GetPath(k1, k2).MustString()...)
+		}
+	}
+
+	return string(content)
 }
 
 func parseNumArray(arrayJson *simplejson.Json) []int {
@@ -209,11 +141,10 @@ func parseList(listJson *simplejson.Json) []interface{} {
 	result := make([]interface{}, size, size)
 
 	for i := 0; i < size; i++ {
-		for k, _ := range listJson.GetIndex(i).MustMap() {
-			result[i] = string(listJson.GetIndex(i).Get(k).)
+		for _, v := range listJson.GetIndex(i).MustMap() {
+			result[i] = v
 		}
 	}
 
 	return result
 }
-
