@@ -6,6 +6,9 @@ import (
 	"log"
 	"strconv"
 	"sort"
+	"net/http"
+	"io/ioutil"
+	"strings"
 )
 
 func main() {
@@ -14,7 +17,20 @@ func main() {
 	}
 
 	result := parse(&os.Args[1])
-	log.Println(result)
+	body := toElasticsearch(result)
+	log.Println(body)
+}
+
+func toElasticsearch(jsonStr *string) *[]byte {
+	resp, err := http.Post("http://localhost:9200/_bulk", "text/json", strings.NewReader(*jsonStr))
+	if err != nil {
+		log.Println("Bulk request error", err)
+	}
+
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+
+	return &body
 }
 
 func parse(jsonStr *string) *string {
@@ -142,9 +158,20 @@ func parseList(listJson *simplejson.Json) []interface{} {
 
 	for i := 0; i < size; i++ {
 		for _, v := range listJson.GetIndex(i).MustMap() {
-			result[i] = v
+			result[i] = forceToString(v)
 		}
 	}
 
 	return result
+}
+
+func forceToString(value interface{}) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case bool:
+		return strconv.FormatBool(v)
+	}
+
+	return "UNKNOWN"
 }

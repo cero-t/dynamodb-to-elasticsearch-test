@@ -1,7 +1,7 @@
 package main
 import (
 	"testing"
-	"log"
+	"fmt"
 )
 
 func TestTimeConsuming(t *testing.T) {
@@ -99,5 +99,6 @@ func TestTimeConsuming(t *testing.T) {
 }`
 
 	result := parse(&json)
-	log.Println(*result)
+	body := toElasticsearch(result)
+	fmt.Println(string(*body))
 }
