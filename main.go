@@ -1,14 +1,19 @@
 package main
 
 import (
-	"os"
 	"github.com/bitly/go-simplejson"
-	"log"
-	"strconv"
-	"sort"
-	"net/http"
 	"io/ioutil"
+	"log"
+	"net/http"
+	"os"
+	"sort"
+	"strconv"
 	"strings"
+)
+
+const (
+	host = "localhost"
+	port = 9200
 )
 
 func main() {
@@ -22,7 +27,8 @@ func main() {
 }
 
 func toElasticsearch(jsonStr *string) *[]byte {
-	resp, err := http.Post("http://localhost:9200/_bulk", "text/json", strings.NewReader(*jsonStr))
+	url := "http://" + host + ":" + strconv.Itoa(port) + "/_bulk"
+	resp, err := http.Post(url, "text/json", strings.NewReader(*jsonStr))
 	if err != nil {
 		log.Println("Bulk request error", err)
 	}
@@ -57,7 +63,8 @@ func parse(jsonStr *string) *string {
 		} else if eventName == "REMOVE" {
 			action.Set("delete", index)
 		} else {
-			log.Fatal("Unknown eventName: " + eventName)
+			log.Println("Unknown eventName", eventName)
+			continue
 		}
 		json, _ := action.Encode()
 
@@ -173,5 +180,6 @@ func forceToString(value interface{}) string {
 		return strconv.FormatBool(v)
 	}
 
+	log.Println("Unknown type", value)
 	return "UNKNOWN"
 }
