@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"reflect"
 )
 
 const (
@@ -137,7 +138,7 @@ func parseKeys(keysJson *simplejson.Json) string {
 	return string(content)
 }
 
-func parseNumArray(arrayJson *simplejson.Json) []int {
+func parseNumArray(arrayJson *simplejson.Json) *[]int {
 	size := len(arrayJson.MustArray())
 	result := make([]int, size, size)
 
@@ -145,10 +146,10 @@ func parseNumArray(arrayJson *simplejson.Json) []int {
 		result[i], _ = strconv.Atoi(arrayJson.GetIndex(i).MustString())
 	}
 
-	return result
+	return &result
 }
 
-func parseMap(mapJson *simplejson.Json) map[string]interface{} {
+func parseMap(mapJson *simplejson.Json) *map[string]interface{} {
 	result := map[string]interface{}{}
 
 	mapValue := mapJson.MustMap()
@@ -156,30 +157,33 @@ func parseMap(mapJson *simplejson.Json) map[string]interface{} {
 		result[k] = parseValue(mapJson.Get(k))
 	}
 
-	return result
+	return &result
 }
 
-func parseList(listJson *simplejson.Json) []interface{} {
+func parseList(listJson *simplejson.Json) *[]interface{} {
 	size := len(listJson.MustArray())
 	result := make([]interface{}, size, size)
 
 	for i := 0; i < size; i++ {
 		for _, v := range listJson.GetIndex(i).MustMap() {
-			result[i] = forceToString(v)
+			result[i] = *forceToString(&v)
 		}
 	}
 
-	return result
+	return &result
 }
 
-func forceToString(value interface{}) string {
-	switch v := value.(type) {
+func forceToString(valRef *interface{}) *string {
+	val := *valRef
+	switch v := val.(type) {
 	case string:
-		return v
+		return &v
 	case bool:
-		return strconv.FormatBool(v)
+		str := strconv.FormatBool(v)
+		return &str
 	}
 
-	log.Println("Unknown type", value)
-	return "UNKNOWN"
+	log.Println("Unknown type", reflect.TypeOf(val))
+	str := "UNKNOWN"
+	return &str
 }

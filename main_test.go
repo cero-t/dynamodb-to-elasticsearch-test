@@ -99,6 +99,7 @@ func TestTimeConsuming(t *testing.T) {
 }`
 
 	result := parse(&json)
+	fmt.Println(*result)
 	body := toElasticsearch(result)
 	fmt.Println(string(*body))
 }
